@@ -1,6 +1,6 @@
 # f5-rest-client
 
-To Use, modify the following in TCL:
+To Use, modify restResponse arguments TCL:
 
   **  Argument 0: (required) METHOD (GET, POST, PUT, DELETE)
     if not specified defaults to GET
