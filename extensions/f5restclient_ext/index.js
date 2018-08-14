@@ -11,9 +11,38 @@ var ilx = new f5.ILXServer();
    var method = req.params()[0] || 'GET';
    var query = req.params()[1] || '';
    var args = req.params()[2] || '';
+   var token = req.params()[3] || '';
    var rest_get;
    var rest_post; // POST, PUT, DELETE, etc...
-
+   
+   if (token) {
+       var options = {
+        mimetypes: {
+		 json: ["application/json", "application/json;charset=utf-8"],
+		 xml: ["application/xml", "application/xml;charset=utf-8"]
+	    },
+	    requestConfig: {
+		 timeout: 1000, //request timeout in milliseconds
+		 noDelay: true, //Enable/disable the Nagle algorithm
+		 keepAlive: true, //Enable/disable keep-alive functionalityidle socket.
+		 keepAliveDelay: 1000 //and optionally set the initial delay before the first keepalive probe is sent
+	    },
+        headers: { "Authorization": token }
+       }
+   } else {
+       var options = {
+        mimetypes: {
+		 json: ["application/json", "application/json;charset=utf-8"],
+		 xml: ["application/xml", "application/xml;charset=utf-8"]
+	    },
+	    requestConfig: {
+		 timeout: 1000, //request timeout in milliseconds
+		 noDelay: true, //Enable/disable the Nagle algorithm
+		 keepAlive: true, //Enable/disable keep-alive functionalityidle socket.
+		 keepAliveDelay: 1000 //and optionally set the initial delay before the first keepalive probe is sent
+	    }
+       }
+   }
    
    if (method === "GET") {
        rest_get = client.get("http://remote.site/rest/xml/method", function (data, response) {
@@ -69,3 +98,4 @@ var ilx = new f5.ILXServer();
  });
 
 ilx.listen();
+

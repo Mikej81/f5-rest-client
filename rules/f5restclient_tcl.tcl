@@ -2,11 +2,11 @@
 ##  F5 ILX APM Generic REST Client
 ##
 ##  Auth type can be Username or OAuth
-##  if OAuth is specified, a token will either be generated based on the 
+##  if OAuth is specified, a token will either be generated based on the
 ##  logged in user,of the static Username specified in restclient_username.
 ##
 ##  If authtype Username is specified, the credentials will be generated
-##  based on the logged in User, or the credentials specified in 
+##  based on the logged in User, or the credentials specified in
 ##  resclient_username/password.
 ##
 ##  Will add additional logic to check if Bearer Token already exists, and
@@ -14,10 +14,10 @@
 ##
 ##  Argument 0: (required) METHOD (GET, POST, PUT, DELETE)
 ##  if not specified defaults to GET
-##  Argument 1: (required) Query, can be full request in leiu of args 
+##  Argument 1: (required) Query, can be full request in leiu of args
 ##  (http://remote.site/tm/mgmt/value/location?arg1=${arg1}&arg2=${arg2})
 ##  Argument 2: (optional) Arguments (json: args:{ arg1: 'value', arg2: 'value'})
-##  Argument 3: (optional) OAuth Bearer Token 
+##  Argument 3: (optional) OAuth Bearer Token
 ##
 ##  Install:
 ##   -Create JWT Key to be referenced below (-key /Common/rest-client)
@@ -33,11 +33,11 @@ when RULE_INIT {
     set static::jwt_expires_in 10
     set static::jwt_leeway 0
     set static::jwt_sdb_timeout_adjustment 3
-    
-    set static::restclient_authtype "oauth" 
-    set static::restclient_authtoken ""
-    set static::restclient_username ""
-    set static::restclient_password ""
+
+    set static::restclient_enablepassthrough "false"
+    set static::restclient_authtype "oauth"
+    set static::restclient_authtoken "Authorization"
+    set static::restclient_username "testuser"
 }
 
 proc gettimeofday {} {
@@ -58,13 +58,13 @@ proc generate_payload { claim_list_string claim_list_boolean_int } {
         }
         append payload {,"} $claim {":"} $value {"}
     }
-    foreach claim $claim_list_boolean_int {
-        set value [ ACCESS::session data get "$static::jwt_sess_var_name.$claim" ]
-        if { [ string length value ] == 0 } {
-            continue
-        }
-        append payload {,"} $claim {":} $value
-    }
+    #foreach claim $claim_list_boolean_int {
+    #    set value [ ACCESS::session data get "$static::jwt_sess_var_name.$claim" ]
+    #    if { [ string length value ] == 0 } {
+    #        continue
+    #    }
+    #    append payload {,"} $claim {":} $value
+    #}
     append payload "\}"
     return $payload
 }
@@ -115,6 +115,14 @@ proc delete_jws_cache {} {
     table delete -subtable $static::jws_cache $user_key
 }
 
+proc is_bearer_token { header } {
+    if { [string tolower [HTTP::header Authorization]] contains "bearer" } {
+      return true
+    } else {
+      return false
+    }
+}
+
 when ACCESS_SESSION_STARTED {
     call set_user_key_to_sdb
 }
@@ -132,7 +140,13 @@ when ACCESS_POLICY_AGENT_EVENT {
     switch -glob [ACCESS::policy agent_id] {
       "REST-CLIENT:*" {
         set restClient [ILX::init f5restclient_plugin f5restclient_ext]
-        set restResponse [ILX::call $restClient rest-client "GET" "http://remote.site/tm/mgmt/value/location?arg1=${arg1}&arg2=${arg2}"]
+        ##  Check if Passthrough Auth enabled, and Bearer Token exists
+        if { $static::restclient_enablepassthrough && [call is_bearer_token [HTTP::header Authorization]] } {
+            set restResponse [ILX::call $restClient rest-client "GET" "https:://remote.site/tm/mgmt/value/location?arg1=Argument" [HTTP::header Authorization] ]
+        } else {
+            set restResponse [ILX::call $restClient rest-client "GET" "http://remote.site/tm/mgmt/value/location?arg1=${arg1}&arg2=${arg2}" [call generate_jws]]
+        }
+        
         if { !([string tolower $restResponse] contains "ERROR") } {
             ACCESS::session data set session.custom.restclient.response
         } else {
@@ -141,3 +155,4 @@ when ACCESS_POLICY_AGENT_EVENT {
       }
     }
 }
+
